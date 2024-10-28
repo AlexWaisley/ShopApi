@@ -1,4 +1,6 @@
 using System.Data.SqlClient;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 using ShopApi.Dto;
 using ShopApi.Entity;
 using ShopApi.FormModels;
@@ -10,11 +12,12 @@ public class Database(IConfiguration configuration)
 {
     private readonly string _connectionString = configuration.GetConnectionString("DefaultConnection")!;
 
-    public User? Login(string email, string password)
+    public User? Login(UserLoginRequest userLoginRequest)
     {
-        using var connection = new SqlConnection(_connectionString);
+        var hashedPassword = HashHelper.ComputeSha256Hash(userLoginRequest.Password);
+        using var connection = new SqliteConnection(_connectionString);
         const string query = """
-                             SELECT User.id, User.name, User.password, EmailInfo.email, EmailInfo.isActive
+                             SELECT User.id, User.name, User.IsAdmin, EmailInfo.email, EmailInfo.isActive
                              FROM User
                              JOIN EmailInfo ON User.Id = EmailInfo.UserId
                              WHERE EmailInfo.email = @Email AND User.password = @Password
@@ -22,8 +25,8 @@ public class Database(IConfiguration configuration)
         connection.Open();
         var command = connection.CreateCommand();
         command.CommandText = query;
-        command.Parameters.AddWithValue("@Email", email);
-        command.Parameters.AddWithValue("@Password", password);
+        command.Parameters.AddWithValue("@Email", userLoginRequest.Email);
+        command.Parameters.AddWithValue("@Password", hashedPassword);
         using var reader = command.ExecuteReader();
         if (reader.Read())
         {
@@ -31,7 +34,7 @@ public class Database(IConfiguration configuration)
             {
                 Id = reader.GetGuid(0),
                 Name = reader.GetString(1),
-                Password = reader.GetString(2),
+                IsAdmin = reader.GetBoolean(2),
                 EmailInfo = new EmailInfo()
                 {
                     Email = reader.GetString(3),
@@ -39,14 +42,15 @@ public class Database(IConfiguration configuration)
                 }
             };
         }
+
         return null;
     }
-    
-    
+
+
     public int Register(UserRegisterRequest userRegisterRequestData)
     {
         var user = userRegisterRequestData.MapToEntity();
-        using var connection = new SqlConnection(_connectionString);
+        using var connection = new SqliteConnection(_connectionString);
         const string query = """
                              Insert into User (Id, Name, Password) VALUES (@UserId, @UserName, @Password);
                              INSERT INTO EmailInfo (Email, IsActive, UserId) VALUES (@Email, @IsActive, @UserId);
@@ -57,14 +61,14 @@ public class Database(IConfiguration configuration)
         command.Parameters.AddWithValue("@Email", user.EmailInfo.Email);
         command.Parameters.AddWithValue("@Password", user.Password);
         command.Parameters.AddWithValue("@UserName", user.Name);
-        command.Parameters.AddWithValue("@IsActive", user.EmailInfo.IsActive?1:0);
+        command.Parameters.AddWithValue("@IsActive", user.EmailInfo.IsActive ? 1 : 0);
         command.Parameters.AddWithValue("@UserId", user.Id);
         return command.ExecuteNonQuery();
     }
 
-    public int UpdatePassword(UserPasswordUpdateRequest userPasswordUpdateRequest,Guid userId)
+    public int UpdatePassword(UserPasswordUpdateRequest userPasswordUpdateRequest, Guid userId)
     {
-        using var connection = new SqlConnection(_connectionString);
+        using var connection = new SqliteConnection(_connectionString);
         const string query = """
                              Update User 
                              Set Password = @NewPassword
@@ -78,10 +82,10 @@ public class Database(IConfiguration configuration)
         command.Parameters.AddWithValue("@UserId", userId);
         return command.ExecuteNonQuery();
     }
-    
+
     public int UpdateInfo(UserUpdateInfoRequest userUpdateInfoRequest, Guid userId)
     {
-        using var connection = new SqlConnection(_connectionString);
+        using var connection = new SqliteConnection(_connectionString);
         const string query = """
                              Update User 
                              Set Name = @NewName
@@ -101,7 +105,7 @@ public class Database(IConfiguration configuration)
 
     public CartDto? GetUserCart(UserDto userDto)
     {
-        using var connection = new SqlConnection(_connectionString);
+        using var connection = new SqliteConnection(_connectionString);
         const string query = """
                              SELECT Cart.Id, CartItem.id, CartItem.CartId, CartItem.Quantity
                              FROM CartItem
@@ -129,12 +133,13 @@ public class Database(IConfiguration configuration)
                 ]
             };
         }
+
         return null;
     }
 
     public int AddToCart(CartItemDto cartItemDto)
     {
-        using var connection = new SqlConnection(_connectionString);
+        using var connection = new SqliteConnection(_connectionString);
         const string query = """
                              Insert Into CartItem (CartId, ProductId, Quantity)
                              VALUES (@CartId,@ProductId,@Quantity);
@@ -147,11 +152,11 @@ public class Database(IConfiguration configuration)
         command.Parameters.AddWithValue("@Quantity", cartItemDto.Quantity);
         return command.ExecuteNonQuery();
     }
-    
-    
+
+
     public int RemoveFromCart(CartItemDto cartItemDto)
     {
-        using var connection = new SqlConnection(_connectionString);
+        using var connection = new SqliteConnection(_connectionString);
         const string query = "Delete From CartItem where Id = @CartItemId";
         connection.Open();
         var command = connection.CreateCommand();
@@ -160,17 +165,18 @@ public class Database(IConfiguration configuration)
         return command.ExecuteNonQuery();
     }
 
-    public IEnumerable<ProductDto> GetProducts(int count)
+    public IEnumerable<ProductDto> GetProducts(int count, int offset)
     {
-        using var connection = new SqlConnection(_connectionString);
+        using var connection = new SqliteConnection(_connectionString);
         const string query = """
                              SELECT Id, Name, Price, IsAvailable, CategoryId 
-                             From Product limit @Count
+                             From Product limit @Count offset @Offset
                              """;
         connection.Open();
         var command = connection.CreateCommand();
         command.CommandText = query;
         command.Parameters.AddWithValue("@Count", count);
+        command.Parameters.AddWithValue("@Offset", offset);
         using var reader = command.ExecuteReader();
         if (reader.Read())
         {
@@ -184,11 +190,11 @@ public class Database(IConfiguration configuration)
             };
         }
     }
-    
-    
+
+
     public ProductDto? GetProductById(Guid id)
     {
-        using var connection = new SqlConnection(_connectionString);
+        using var connection = new SqliteConnection(_connectionString);
         const string query = """
                              SELECT Id, Name, Price, IsAvailable, CategoryId 
                              From Product 
@@ -213,10 +219,10 @@ public class Database(IConfiguration configuration)
 
         return null;
     }
-    
-    public IEnumerable<ProductDto> GetProductsByCategory(int categoryId,int count, int offset)
+
+    public IEnumerable<ProductDto> GetProductsByCategory(int categoryId, int count, int offset)
     {
-        using var connection = new SqlConnection(_connectionString);
+        using var connection = new SqliteConnection(_connectionString);
         const string query = """
                              SELECT Id, Name, Price, IsAvailable, CategoryId 
                              From Product 
@@ -243,11 +249,11 @@ public class Database(IConfiguration configuration)
             };
         }
     }
-    
-    
+
+
     public ProductFullDto? GetProductInfo(Guid productId)
     {
-        using var connection = new SqlConnection(_connectionString);
+        using var connection = new SqliteConnection(_connectionString);
         const string query = """
                              SELECT Id, Name, Description, Price, IsAvailable, CategoryId 
                              From Product 
@@ -274,19 +280,22 @@ public class Database(IConfiguration configuration)
         return null;
     }
 
-    public IEnumerable<ProductImage> GetProductPreviews(Guid productId)
+    public IEnumerable<ProductImage> GetProductPreviews(Guid productId, int count, int offset)
     {
-        using var connection = new SqlConnection(_connectionString);
+        using var connection = new SqliteConnection(_connectionString);
         const string query = """
                              SELECT Url 
                              From Image 
                                  JOIN ProductImage On Image.Id = ProductImage.ImageId 
-                             where ProductImage.ProductId=@ProductId;
+                             where ProductImage.ProductId=@ProductId
+                             limit @Count offset @Offset;
                              """;
         connection.Open();
         var command = connection.CreateCommand();
         command.CommandText = query;
         command.Parameters.AddWithValue("@ProductId", productId);
+        command.Parameters.AddWithValue("@Count", count);
+        command.Parameters.AddWithValue("@Offset", offset);
         using var reader = command.ExecuteReader();
         if (reader.Read())
         {
@@ -300,7 +309,7 @@ public class Database(IConfiguration configuration)
 
     public IEnumerable<CategoryDto> GetAllCategories()
     {
-        using var connection = new SqlConnection(_connectionString);
+        using var connection = new SqliteConnection(_connectionString);
         const string query = """
                              SELECT Category.Id, ParentCategoryId, name, Url
                                  from Image 
@@ -324,8 +333,7 @@ public class Database(IConfiguration configuration)
 
     public OrderDto? GetOrder(Guid id)
     {
-        
-        using var connection = new SqlConnection(_connectionString);
+        using var connection = new SqliteConnection(_connectionString);
         const string query = """
                              SELECT OrderRecord.Id, UserId, Status, ShippingAddressId 
                              From OrderRecord  
@@ -349,11 +357,11 @@ public class Database(IConfiguration configuration)
 
         return null;
     }
-    
-    
+
+
     public IEnumerable<OrderDto> GetUserOrders(Guid userId)
     {
-        using var connection = new SqlConnection(_connectionString);
+        using var connection = new SqliteConnection(_connectionString);
         const string query = """
                              SELECT Id, UserId, Status, ShippingAddressId 
                              From OrderRecord 
@@ -375,11 +383,11 @@ public class Database(IConfiguration configuration)
             };
         }
     }
-    
-    
+
+
     public IEnumerable<OrderItemDto> GetOrderItems(Guid orderId)
     {
-        using var connection = new SqlConnection(_connectionString);
+        using var connection = new SqliteConnection(_connectionString);
         const string query = """
                              SELECT OrderId, ProductId, Quantity 
                              From OrderItem 
@@ -403,7 +411,7 @@ public class Database(IConfiguration configuration)
 
     public int CreateOrder(OrderDto orderDto, Guid userId, List<OrderItemDto> orderItemsDto)
     {
-        using var connection = new SqlConnection(_connectionString);
+        using var connection = new SqliteConnection(_connectionString);
         const string query = """
                              Insert Into OrderRecord (Id, Status, UserId, ShippingAddressId)
                              VALUES (@OrderId,@Status,@UserId,@ShippingAddressId);
@@ -421,23 +429,18 @@ public class Database(IConfiguration configuration)
         foreach (var orderItemDto in orderItemsDto)
         {
             const string query1 = """
-                                 Insert Into OrderItem (OrderId, ProductId, Quantity) 
-                                 values (@OrderId,@ProductId,@Quantity);
-                                 """;
+                                  Insert Into OrderItem (OrderId, ProductId, Quantity) 
+                                  values (@OrderId,@ProductId,@Quantity);
+                                  """;
             using var commandOrderItem = connection.CreateCommand();
             commandOrderItem.CommandText = query1;
             commandOrderItem.Parameters.AddWithValue("@OrderId", orderDto.Id);
             commandOrderItem.Parameters.AddWithValue("@ProductId", orderItemDto.ProductId);
             commandOrderItem.Parameters.AddWithValue("@Quantity", orderItemDto.Quantity);
-            
+
             command.ExecuteNonQuery();
         }
 
         return 1;
     }
-
-
-
-    
-    
 }

@@ -6,7 +6,7 @@ namespace ShopApi.FormModels;
 public class UserPasswordUpdateRequest
 {
     [JsonProperty("oldPassword")]
-    public string CurrentPassword { get; set; }
+    public required string CurrentPassword { get; set; }
     [JsonProperty("newPassword")]
-    public string NewPassword { get; set; }
+    public required string NewPassword { get; set; }
 }

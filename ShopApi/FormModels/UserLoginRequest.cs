@@ -3,10 +3,11 @@ using Newtonsoft.Json;
 namespace ShopApi.FormModels;
 
 [Serializable]
-public class UserUpdateInfoRequest
+public class UserLoginRequest
 {
     [JsonProperty("email")]
     public required string Email { get; set; }
-    [JsonProperty("name")]
-    public required string Name { get; set; }
+    [JsonProperty("password")]
+    public required string Password { get; set; }
+    
 }

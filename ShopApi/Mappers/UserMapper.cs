@@ -12,6 +12,7 @@ public static class UserMapper
         {
             Id = user.Id,
             Email = user.EmailInfo,
+            IsAdmin = user.IsAdmin,
             Username = user.Name
         };
     }
@@ -22,7 +23,17 @@ public static class UserMapper
         {
             Id = userDto.Id,
             EmailInfo = userDto.Email,
-            Name = userDto.Username
+            Name = userDto.Username,
+            IsAdmin = userDto.IsAdmin
+        };
+    }
+
+    public static UserLoginRequest MapToLoginRequest(this UserRegisterRequest userRegisterRequest)
+    {
+        return new UserLoginRequest()
+        {
+            Email = userRegisterRequest.Email,
+            Password = userRegisterRequest.Password,
         };
     }
 
@@ -31,9 +42,14 @@ public static class UserMapper
         return new User()
         {
             Id = Guid.NewGuid(),
-            EmailInfo = userRegisterRequest.EmailInfo,
+            EmailInfo = new EmailInfo
+            {
+                Email = userRegisterRequest.Email,
+                IsActive = false
+            },
             Name = userRegisterRequest.Name,
-            Password = HashHelper.ComputeSha256Hash(userRegisterRequest.Password)
+            Password = HashHelper.ComputeSha256Hash(userRegisterRequest.Password),
+            IsAdmin = false
         };
     }
 }

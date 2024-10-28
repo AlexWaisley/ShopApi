@@ -3,32 +3,41 @@ using ShopApi.Dto;
 
 namespace ShopApi.Controllers;
 
-public class OrderReportController
+[ApiController]
+[Route("[controller]")]
+public class OrderReportController(Database database) : ControllerBase
 {
     private readonly ILogger<OrderReportController> _logger;
 
-    public OrderReportController(ILogger<OrderReportController> logger)
-    {
-        _logger = logger;
-    }
 
-    [HttpGet(Name = "order")]
-    public async Task<IEnumerable<OrderDto>> GetOrder(string orderId)
+    [HttpGet("/orders/all/info")]
+    public IActionResult GetOrder([FromBody]Guid orderId)
     {
-        throw new NotImplementedException();
+        var result = database.GetOrder(orderId);
+        
+        if (result is not null)
+            return Ok(result);
+        return NotFound();
     }
-    [HttpGet(Name = "user-orders")]
-    //user id from cookie
+    
+    
+    [HttpGet("/orders/user")]
     public async Task<IEnumerable<OrderDto>> GetUserOrders()
     {
         throw new NotImplementedException();
+
     }
-    [HttpGet(Name="order-items")]
-    public async Task<IEnumerable<OrderItemDto>> GetOrderItems(string orderId)
+    
+    [HttpGet("/orders/all/info/items")]
+    public IActionResult GetOrderItems([FromBody]Guid orderId)
     {
-        throw new NotImplementedException();
+        var result = database.GetOrderItems(orderId);
+        if (result.Any())
+            return Ok(result);
+        return NotFound();
     }
-    [HttpPost(Name="new-order")]
+    
+    [HttpPost("/orders/create")]
     public async Task<OrderDto> CreateOrder(OrderDto order)
     {
         throw new NotImplementedException();

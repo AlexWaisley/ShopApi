@@ -1,37 +1,47 @@
 using Microsoft.AspNetCore.Mvc;
-using ShopApi.Dto;
-using ShopApi.Entity;
 
 namespace ShopApi.Controllers;
 
-public class ProductController
+[ApiController]
+[Route("[controller]")]
+public class ProductController(Database database) : ControllerBase
 {
-    [HttpGet]
-    public Task<IEnumerable<ProductDto>> GetProducts(int count, int offset)
+    [HttpGet("/products/general/count={count:int}&offset={offset:int}")]
+    public IActionResult GetProducts(int count, int offset)
     {
-        throw new NotImplementedException();
+        var result = database.GetProducts(count, offset);
+
+        if (result.Any())
+            return Ok(result);
+        return NotFound();
     }
-    
-    [HttpGet("{id}")]
-    public Task<ProductFullDto> GetFullProduct(int id)
+
+    [HttpGet("/products/full")]
+    public IActionResult GetFullProduct([FromBody] Guid id)
     {
-        throw new NotImplementedException();
+        var result = database.GetProductInfo(id);
+        if (result is not null)
+            return Ok(result);
+        return NotFound();
     }
-    
-    [HttpGet("category/{categoryId}")]
-    public Task<IEnumerable<ProductDto>> GetProductsByCategory(int categoryId, int count , int offset)
+
+    [HttpGet("/products/category/count={count:int}&offset={offset:int}")]
+    public IActionResult GetProductsByCategory([FromBody] int categoryId, int count, int offset)
     {
-        throw new NotImplementedException();
+        var result = database.GetProductsByCategory(categoryId, count, offset);
+
+        if (result.Any())
+            return Ok(result);
+        return NotFound();
     }
-    
-    [HttpGet("preview/{id}&{count}")]
-    public Task<IEnumerable<ProductImage>> GetProductPreviews(int id, int count)
+
+    [HttpGet("/products/previews/count={count:int}&offset={offset:int}")]
+    public IActionResult GetProductPreviews([FromBody] Guid id, int count, int offset)
     {
-        throw new NotImplementedException();
+        var result = database.GetProductPreviews(id, count, offset);
+        
+        if (result.Any())
+            return Ok(result);
+        return NotFound();
     }
-    
-    
-    
-    
-    
 }
