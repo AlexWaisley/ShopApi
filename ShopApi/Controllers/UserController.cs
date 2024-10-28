@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using ShopApi.Dto;
+using ShopApi.FormModels;
 
 namespace ShopApi.Controllers;
 
@@ -46,13 +47,13 @@ public class UserController
     }
     
     [HttpPost("/updatePassword")]
-    public Results<Ok,NotFound> UpdatePassword(string password)
+    public Results<Ok,NotFound> UpdatePassword(UserPasswordUpdateRequest userPasswordUpdateRequest)
     {
         throw new NotImplementedException();
     }
     
     [HttpPost("/updateUserInfo")]
-    public Results<Ok,NotFound> UpdateUserInfo(string email, string name)
+    public Results<Ok,NotFound> UpdateUserInfo(UserUpdateInfoRequest userUpdateInfoRequest)
     {
         throw new NotImplementedException();
     }

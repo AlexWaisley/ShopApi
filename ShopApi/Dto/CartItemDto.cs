@@ -11,8 +11,6 @@ public class CartItemDto
     public Guid ProductId { get; set; }
     [JsonPropertyName("quantity")]
     public int Quantity { get; set; }
-    [JsonPropertyName("price")]
-    public decimal Price { get; set; }
     [JsonPropertyName("cartId")]
     public Guid CartId { get; set; }
 }

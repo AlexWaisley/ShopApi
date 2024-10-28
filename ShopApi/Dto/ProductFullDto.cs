@@ -10,5 +10,5 @@ public class ProductFullDto
     [JsonPropertyName("description")] public required string Description { get; set; }
     [JsonPropertyName("price")] public required decimal Price { get; set; }
     [JsonPropertyName("isAvailable")] public required bool IsAvailable { get; set; }
-    [JsonPropertyName("categoryId")] public required Guid CategoryId { get; set; }
+    [JsonPropertyName("categoryId")] public required int CategoryId { get; set; }
 }
