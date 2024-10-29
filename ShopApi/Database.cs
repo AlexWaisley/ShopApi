@@ -103,7 +103,7 @@ public class Database(IConfiguration configuration)
         return command.ExecuteNonQuery();
     }
 
-    public CartDto? GetUserCart(UserDto userDto)
+    public CartDto? GetUserCart(Guid userId)
     {
         using var connection = new SqliteConnection(_connectionString);
         const string query = """
@@ -115,7 +115,7 @@ public class Database(IConfiguration configuration)
         connection.Open();
         var command = connection.CreateCommand();
         command.CommandText = query;
-        command.Parameters.AddWithValue("@UserId", userDto.Id.ToString());
+        command.Parameters.AddWithValue("@UserId", userId.ToString());
         using var reader = command.ExecuteReader();
         if (reader.Read())
         {
@@ -154,14 +154,14 @@ public class Database(IConfiguration configuration)
     }
 
 
-    public int RemoveFromCart(CartItemDto cartItemDto)
+    public int RemoveFromCart(Guid cartItemId)
     {
         using var connection = new SqliteConnection(_connectionString);
         const string query = "Delete From CartItem where Id = @CartItemId";
         connection.Open();
         var command = connection.CreateCommand();
         command.CommandText = query;
-        command.Parameters.AddWithValue("@CartItemId", cartItemDto.Id);
+        command.Parameters.AddWithValue("@CartItemId", cartItemId.ToString());
         return command.ExecuteNonQuery();
     }
 
@@ -409,7 +409,7 @@ public class Database(IConfiguration configuration)
         }
     }
 
-    public int CreateOrder(OrderDto orderDto, Guid userId, List<OrderItemDto> orderItemsDto)
+    public int CreateOrder(OrderCreateRequest orderCreateRequest, Guid userId)
     {
         using var connection = new SqliteConnection(_connectionString);
         const string query = """
@@ -419,14 +419,14 @@ public class Database(IConfiguration configuration)
         connection.Open();
         var command = connection.CreateCommand();
         command.CommandText = query;
-        command.Parameters.AddWithValue("@OrderId", orderDto.Id);
-        command.Parameters.AddWithValue("@Status", orderDto.Status);
+        command.Parameters.AddWithValue("@OrderId", orderCreateRequest.OrderDto.Id);
+        command.Parameters.AddWithValue("@Status", orderCreateRequest.OrderDto.Status);
         command.Parameters.AddWithValue("@UserId", userId);
-        command.Parameters.AddWithValue("@ShippingAddressId", orderDto.ShippingAddressId);
+        command.Parameters.AddWithValue("@ShippingAddressId", orderCreateRequest.OrderDto.ShippingAddressId);
         var status = command.ExecuteNonQuery();
         if (status == 0)
             return 0;
-        foreach (var orderItemDto in orderItemsDto)
+        foreach (var orderItemDto in orderCreateRequest.OrderItemsDto)
         {
             const string query1 = """
                                   Insert Into OrderItem (OrderId, ProductId, Quantity) 
@@ -434,7 +434,7 @@ public class Database(IConfiguration configuration)
                                   """;
             using var commandOrderItem = connection.CreateCommand();
             commandOrderItem.CommandText = query1;
-            commandOrderItem.Parameters.AddWithValue("@OrderId", orderDto.Id);
+            commandOrderItem.Parameters.AddWithValue("@OrderId", orderCreateRequest.OrderDto.Id);
             commandOrderItem.Parameters.AddWithValue("@ProductId", orderItemDto.ProductId);
             commandOrderItem.Parameters.AddWithValue("@Quantity", orderItemDto.Quantity);
 

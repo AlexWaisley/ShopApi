@@ -1,5 +1,8 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.IdentityModel.JsonWebTokens;
 using ShopApi.Dto;
 using ShopApi.FormModels;
 using ShopApi.Mappers;
@@ -10,22 +13,45 @@ namespace ShopApi.Controllers;
 [Route("[controller]")]
 public class UserController(Database database, TokenGenerator tokenGenerator) : ControllerBase
 {
-    [HttpGet("cart")]
-    public async Task<CartDto> GetCart()
+    [Authorize]
+    [HttpGet("/user/cart/info")]
+    public IActionResult GetCart()
     {
-        throw new NotImplementedException();
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userId is null)
+            return BadRequest();
+        var id = Guid.Parse(userId);
+        var result = database.GetUserCart(id);
+        if (result is null)
+            return NotFound();
+        return Ok(result);
     }
 
-    [HttpPost("cart")]
-    public async Task<CartDto> AddToCart(CartItemDto item)
+    [Authorize]
+    [HttpPost("/user/cart/item")]
+    public IActionResult AddToCart([FromBody]CartItemDto item)
     {
-        throw new NotImplementedException();
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userId is null)
+            return BadRequest();
+        var id = Guid.Parse(userId);
+        var result = database.AddToCart(item);
+        if (result < 1)
+            return NotFound();
+        return Ok(result);
     }
 
-    [HttpDelete("cart/{id}")]
-    public async Task<CartDto> RemoveFromCart(string id)
+    [Authorize]
+    [HttpDelete("/user/cart/item")]
+    public IActionResult RemoveFromCart([FromBody]Guid id)
     {
-        throw new NotImplementedException();
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userId is null)
+            return BadRequest();
+        var result = database.RemoveFromCart(id);
+        if (result < 1)
+            return NotFound();
+        return Ok(result);
     }
 
     [HttpGet("/login")]
@@ -35,7 +61,7 @@ public class UserController(Database database, TokenGenerator tokenGenerator) : 
         if (result is null) return NotFound();
         
         var token = tokenGenerator.GenerateToken(result.Id,result.EmailInfo.Email,result.IsAdmin);
-        Response.Cookies.Append("jwt",token,new CookieOptions()
+        Response.Cookies.Append("ultra-shop-token",token,new CookieOptions()
         {
             HttpOnly = true,
             SameSite = SameSiteMode.Strict,
@@ -53,31 +79,47 @@ public class UserController(Database database, TokenGenerator tokenGenerator) : 
         if (result is null) return NotFound();
         
         var token = tokenGenerator.GenerateToken(result.Id,result.EmailInfo.Email,result.IsAdmin);
-        Response.Cookies.Append("jwt",token,new CookieOptions()
+        Response.Cookies.Append("ultra-shop-token",token,new CookieOptions()
         {
             HttpOnly = true,
             SameSite = SameSiteMode.Strict,
             Expires = DateTimeOffset.UtcNow.AddHours(1)
         });
         return Ok(result.MapToDto());
-
     }
 
+    [Authorize]
     [HttpPost("/verifyEmail")]
     public Results<Ok, NotFound> VerifyEmail(string email, string code)
     {
         throw new NotImplementedException();
     }
 
-    [HttpPost("/updatePassword")]
-    public Results<Ok, NotFound> UpdatePassword(UserPasswordUpdateRequest userPasswordUpdateRequest)
+    [Authorize]
+    [HttpPost("/user/password")]
+    public IActionResult UpdatePassword([FromBody]UserPasswordUpdateRequest userPasswordUpdateRequest)
     {
-        throw new NotImplementedException();
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userId is null)
+            return BadRequest();
+        var id = Guid.Parse(userId);
+        var result = database.UpdatePassword(userPasswordUpdateRequest,id);
+        if (result < 1)
+            return NotFound();
+        return Ok();
     }
 
-    [HttpPost("/updateUserInfo")]
-    public Results<Ok, NotFound> UpdateUserInfo(UserUpdateInfoRequest userUpdateInfoRequest)
+    [Authorize]
+    [HttpPost("/user/info")]
+    public IActionResult UpdateUserInfo([FromBody]UserUpdateInfoRequest userUpdateInfoRequest)
     {
-        throw new NotImplementedException();
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userId is null)
+            return BadRequest();
+        var id = Guid.Parse(userId);
+        var result = database.UpdateInfo(userUpdateInfoRequest,id);
+        if (result < 1)
+            return NotFound();
+        return Ok();
     }
 }

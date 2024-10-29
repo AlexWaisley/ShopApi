@@ -17,7 +17,7 @@ public class TokenGenerator(ConfigurationManager configurationManager)
         var claims = new List<Claim>()
         {
             new (JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-            new (JwtRegisteredClaimNames.Sub,userId.ToString()),
+            new (JwtRegisteredClaimNames.Sub, userId.ToString()),
             new (JwtRegisteredClaimNames.Email, email),
             new ("isAdmin", isAdmin.ToString()),
         };
