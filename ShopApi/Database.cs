@@ -424,20 +424,80 @@ public class Database(IConfiguration configuration)
         command.Parameters.AddWithValue("@UserId", userId);
         command.Parameters.AddWithValue("@ShippingAddressId", orderCreateRequest.OrderDto.ShippingAddressId);
         var status = command.ExecuteNonQuery();
+        command.Parameters.Clear();
         if (status == 0)
             return 0;
+        
+        const string query1 = """
+                              Insert Into OrderItem (OrderId, ProductId, Quantity) 
+                              values (@OrderId,@ProductId,@Quantity);
+                              """;
+        command.CommandText = query1;
+        command.Parameters.AddWithValue("@OrderId", orderCreateRequest.OrderDto.Id);
         foreach (var orderItemDto in orderCreateRequest.OrderItemsDto)
         {
-            const string query1 = """
-                                  Insert Into OrderItem (OrderId, ProductId, Quantity) 
-                                  values (@OrderId,@ProductId,@Quantity);
-                                  """;
-            using var commandOrderItem = connection.CreateCommand();
-            commandOrderItem.CommandText = query1;
-            commandOrderItem.Parameters.AddWithValue("@OrderId", orderCreateRequest.OrderDto.Id);
-            commandOrderItem.Parameters.AddWithValue("@ProductId", orderItemDto.ProductId);
-            commandOrderItem.Parameters.AddWithValue("@Quantity", orderItemDto.Quantity);
+            command.Parameters.AddWithValue("@ProductId", orderItemDto.ProductId);
+            command.Parameters.AddWithValue("@Quantity", orderItemDto.Quantity);
+            command.ExecuteNonQuery();
+        }
 
+        return 1;
+    }
+
+    public int AddCategory(CategoryCreateRequest categoryCreateRequest)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        const string query = """
+                             Insert INTO Image (Url)
+                             values (@ImageUrl);
+                             Insert Into Category (ParentCategoryId, Name, ImageId)
+                             VALUES (@ParentCategoryId,@Name,last_insert_rowid());
+                             """;
+        connection.Open();
+        var command = connection.CreateCommand();
+        command.CommandText = query;
+        command.Parameters.AddWithValue("@ParentCategoryId", categoryCreateRequest.ParentCategory);
+        command.Parameters.AddWithValue("@Name", categoryCreateRequest.Name);
+        command.Parameters.AddWithValue("@ImageUrl", categoryCreateRequest.ImageUrl);
+        return command.ExecuteNonQuery();
+    }
+
+    public int AddProduct(Product product)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        const string query = """
+                             Insert INTO Product (Id, Name, Description, Price, IsAvailable, CategoryId)
+                             values (@ProductId,@Name,@Description,@Price,@IsAvailable,@CategoryId);
+                             """;
+        connection.Open();
+        var command = connection.CreateCommand();
+        command.CommandText = query;
+        command.Parameters.AddWithValue("@ProductId", product.Id);
+        command.Parameters.AddWithValue("@Name", product.Name);
+        command.Parameters.AddWithValue("@Description", product.Description);
+        command.Parameters.AddWithValue("@Price", product.Price);
+        command.Parameters.AddWithValue("@IsAvailable", product.IsAvailable);
+        command.Parameters.AddWithValue("@CategoryId", product.CategoryId);
+        
+        return command.ExecuteNonQuery();
+    }
+    
+    public int AddPreviews(Guid productId, IEnumerable<string> previews)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        const string query = """
+                             Insert INTO Image (Url)
+                             values (@ImageUrl);
+                             Insert INTO ProductImage (ProductId, ImageId)
+                             values (@ProductId, last_insert_rowid());
+                             """;
+        connection.Open();
+        var command = connection.CreateCommand();
+        command.CommandText = query;
+        command.Parameters.AddWithValue("@ProductId", productId);
+        foreach (var preview in previews)
+        {
+            command.Parameters.AddWithValue("@ImageUrl", preview);
             command.ExecuteNonQuery();
         }
 

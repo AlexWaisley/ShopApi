@@ -5,11 +5,16 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.IdentityModel.Tokens;
 using ShopApi;
 using ShopApi.Entity;
+using ShopApi.Identity;
 
 var builder = WebApplication.CreateBuilder(args);
 var config = builder.Configuration;
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(
+    options =>
+    {
+        options.AddPolicy(IdentityData.AdminUserPolicyName, policy => policy.RequireClaim(IdentityData.AdminUserClaimName, "True"));
+    });
 JwtSecurityTokenHandler.DefaultOutboundClaimTypeMap.Clear();
 builder.Services.AddAuthentication(x =>
     {

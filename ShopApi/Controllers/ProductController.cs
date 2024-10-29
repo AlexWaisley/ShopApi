@@ -1,4 +1,8 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using ShopApi.FormModels;
+using ShopApi.Identity;
+using ShopApi.Mappers;
 
 namespace ShopApi.Controllers;
 
@@ -43,5 +47,17 @@ public class ProductController(Database database) : ControllerBase
         if (result.Any())
             return Ok(result);
         return NotFound();
+    }
+    
+    [Authorize(Policy = IdentityData.AdminUserPolicyName)]
+    [HttpPost("/products/add")]
+    public IActionResult AddProduct([FromBody] ProductCreateRequest productCreateRequest)
+    {
+        var product = productCreateRequest.MapToEntity();
+        var result = database.AddProduct(product);
+        var result1 = database.AddPreviews(product.Id, productCreateRequest.Previews);
+        if (result > 0)
+            return Ok();
+        return BadRequest();
     }
 }

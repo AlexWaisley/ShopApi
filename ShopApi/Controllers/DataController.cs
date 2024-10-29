@@ -1,7 +1,10 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using ShopApi.Dto;
 using ShopApi.Entity;
+using ShopApi.FormModels;
+using ShopApi.Identity;
 
 namespace ShopApi.Controllers;
 
@@ -19,5 +22,15 @@ public class DataController(Database database) : ControllerBase
         if (result.Any())
             return Ok(result);
         return NotFound();
+    }
+    
+    [Authorize(Policy = IdentityData.AdminUserPolicyName)]
+    [HttpPost("/categories")]
+    public IActionResult CreateCategory([FromBody]CategoryCreateRequest category)
+    {
+        var result = database.AddCategory(category);
+        if (result > 0)
+            return Ok();
+        return BadRequest();
     }
 }
