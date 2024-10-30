@@ -10,11 +10,8 @@ using ShopApi.Identity;
 var builder = WebApplication.CreateBuilder(args);
 var config = builder.Configuration;
 
-builder.Services.AddAuthorization(
-    options =>
-    {
-        options.AddPolicy(IdentityData.AdminUserPolicyName, policy => policy.RequireClaim(IdentityData.AdminUserClaimName, "True"));
-    });
+builder.Services.AddAuthorizationBuilder()
+    .AddPolicy(IdentityData.AdminUserPolicyName, policy => policy.RequireClaim(IdentityData.AdminUserClaimName, "True"));
 JwtSecurityTokenHandler.DefaultOutboundClaimTypeMap.Clear();
 builder.Services.AddAuthentication(x =>
     {
@@ -36,6 +33,17 @@ builder.Services.AddAuthentication(x =>
         };
     });
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("DevSite",
+        policy  =>
+        {
+            policy.WithOrigins("http://localhost:5173")
+                .AllowCredentials()
+                .AllowAnyHeader()
+                .AllowAnyMethod();
+        });
+});
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -52,6 +60,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+app.UseCors("DevSite");
 
 app.UseAuthentication();
 app.UseAuthorization();

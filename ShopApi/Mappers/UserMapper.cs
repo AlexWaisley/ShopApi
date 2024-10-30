@@ -13,7 +13,7 @@ public static class UserMapper
             Id = user.Id,
             Email = user.EmailInfo,
             IsAdmin = user.IsAdmin,
-            Username = user.Name
+            Name = user.Name
         };
     }
 
@@ -23,7 +23,7 @@ public static class UserMapper
         {
             Id = userDto.Id,
             EmailInfo = userDto.Email,
-            Name = userDto.Username,
+            Name = userDto.Name,
             IsAdmin = userDto.IsAdmin
         };
     }

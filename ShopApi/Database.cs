@@ -1,6 +1,4 @@
-using System.Data.SqlClient;
 using Microsoft.Data.Sqlite;
-using Microsoft.EntityFrameworkCore;
 using ShopApi.Dto;
 using ShopApi.Entity;
 using ShopApi.FormModels;
@@ -330,6 +328,31 @@ public class Database(IConfiguration configuration)
             };
         }
     }
+    public IEnumerable<CategoryDto> GetCategoriesByParentCategoryId(int parentCategoryId)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        const string query = """
+                             SELECT Category.Id, ParentCategoryId, name, Url
+                                 from Image 
+                                     join Category on Image.Id = Category.ImageId
+                             where ParentCategoryId=@ParentCategoryId;
+                             """;
+        connection.Open();
+        var command = connection.CreateCommand();
+        command.CommandText = query;
+        command.Parameters.AddWithValue("@ParentCategoryId", parentCategoryId);
+        using var reader = command.ExecuteReader();
+        if (reader.Read())
+        {
+            yield return new CategoryDto()
+            {
+                Id = reader.GetInt32(0),
+                ParentCategory = reader.GetInt32(1),
+                Name = reader.GetString(2),
+                ImageUrl = reader.GetString(3)
+            };
+        }
+    }
 
     public OrderDto? GetOrder(Guid id)
     {
@@ -363,9 +386,9 @@ public class Database(IConfiguration configuration)
     {
         using var connection = new SqliteConnection(_connectionString);
         const string query = """
-                             SELECT Id, UserId, Status, ShippingAddressId 
-                             From OrderRecord 
-                             where OrderRecord.UserId=@UserId;
+                             SELECT OrderRecord.Id, UserId, Status, ShippingAddressId 
+                             From OrderRecord  
+                             where UserId=@UserId
                              """;
         connection.Open();
         var command = connection.CreateCommand();
@@ -409,8 +432,9 @@ public class Database(IConfiguration configuration)
         }
     }
 
-    public int CreateOrder(OrderCreateRequest orderCreateRequest, Guid userId)
+    public int CreateOrder(int shippingAddressId, Guid userId)
     {
+        var orderDto = OrderMapper.MapToDto(shippingAddressId,userId);
         using var connection = new SqliteConnection(_connectionString);
         const string query = """
                              Insert Into OrderRecord (Id, Status, UserId, ShippingAddressId)
@@ -419,13 +443,17 @@ public class Database(IConfiguration configuration)
         connection.Open();
         var command = connection.CreateCommand();
         command.CommandText = query;
-        command.Parameters.AddWithValue("@OrderId", orderCreateRequest.OrderDto.Id);
-        command.Parameters.AddWithValue("@Status", orderCreateRequest.OrderDto.Status);
+        command.Parameters.AddWithValue("@OrderId", orderDto.Id);
+        command.Parameters.AddWithValue("@Status", orderDto.Status);
         command.Parameters.AddWithValue("@UserId", userId);
-        command.Parameters.AddWithValue("@ShippingAddressId", orderCreateRequest.OrderDto.ShippingAddressId);
+        command.Parameters.AddWithValue("@ShippingAddressId", orderDto.ShippingAddressId);
         var status = command.ExecuteNonQuery();
         command.Parameters.Clear();
         if (status == 0)
+            return 0;
+        
+        var cartInfo = GetUserCart(userId);
+        if (cartInfo is null)
             return 0;
         
         const string query1 = """
@@ -433,14 +461,19 @@ public class Database(IConfiguration configuration)
                               values (@OrderId,@ProductId,@Quantity);
                               """;
         command.CommandText = query1;
-        command.Parameters.AddWithValue("@OrderId", orderCreateRequest.OrderDto.Id);
-        foreach (var orderItemDto in orderCreateRequest.OrderItemsDto)
+        command.Parameters.AddWithValue("@OrderId", orderDto.Id);
+        foreach (var orderItemDto in cartInfo.Items)
         {
             command.Parameters.AddWithValue("@ProductId", orderItemDto.ProductId);
             command.Parameters.AddWithValue("@Quantity", orderItemDto.Quantity);
             command.ExecuteNonQuery();
         }
-
+        
+        const string query2 = "Delete From CartItem where CartId = @CartId";
+        command.CommandText = query2;
+        command.Parameters.AddWithValue("@CartId", cartInfo.Id);
+        command.ExecuteNonQuery();
+        
         return 1;
     }
 

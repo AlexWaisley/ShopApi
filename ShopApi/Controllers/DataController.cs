@@ -14,11 +14,19 @@ public class DataController(Database database) : ControllerBase
 {
     private readonly ILogger<DataController> _logger;
 
-
     [HttpGet("/categories")]
     public IActionResult GetCategories()
     {
         var result = database.GetAllCategories();
+        if (result.Any())
+            return Ok(result);
+        return NotFound();
+    }
+    
+    [HttpGet("/categories/id={id:int}")]
+    public IActionResult GetCategoriesByParentId(int id)
+    {
+        var result = database.GetCategoriesByParentCategoryId(id);
         if (result.Any())
             return Ok(result);
         return NotFound();

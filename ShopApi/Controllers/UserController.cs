@@ -38,7 +38,7 @@ public class UserController(Database database, TokenGenerator tokenGenerator) : 
         var result = database.AddToCart(item);
         if (result < 1)
             return NotFound();
-        return Ok(result);
+        return Ok();
     }
 
     [Authorize]
@@ -51,10 +51,10 @@ public class UserController(Database database, TokenGenerator tokenGenerator) : 
         var result = database.RemoveFromCart(id);
         if (result < 1)
             return NotFound();
-        return Ok(result);
+        return Ok();
     }
 
-    [HttpGet("/login")]
+    [HttpPost("/login")]
     public IActionResult Login([FromBody] UserLoginRequest userLoginRequest)
     {
         var result = database.Login(userLoginRequest);
@@ -63,7 +63,6 @@ public class UserController(Database database, TokenGenerator tokenGenerator) : 
         var token = tokenGenerator.GenerateToken(result.Id,result.EmailInfo.Email,result.IsAdmin);
         Response.Cookies.Append("ultra-shop-token",token,new CookieOptions()
         {
-            HttpOnly = true,
             SameSite = SameSiteMode.Strict,
             Expires = DateTimeOffset.UtcNow.AddHours(1)
         });
@@ -81,7 +80,6 @@ public class UserController(Database database, TokenGenerator tokenGenerator) : 
         var token = tokenGenerator.GenerateToken(result.Id,result.EmailInfo.Email,result.IsAdmin);
         Response.Cookies.Append("ultra-shop-token",token,new CookieOptions()
         {
-            HttpOnly = true,
             SameSite = SameSiteMode.Strict,
             Expires = DateTimeOffset.UtcNow.AddHours(1)
         });

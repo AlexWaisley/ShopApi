@@ -13,15 +13,23 @@ public class OrderReportController(Database database) : ControllerBase
 {
     private readonly ILogger<OrderReportController> _logger;
 
-
-    [HttpGet("/orders/all/info")]
-    public IActionResult GetOrder([FromBody] Guid orderId)
+    [HttpGet("/orders/{orderId:guid}/all/info")]
+    public IActionResult GetOrder(Guid orderId)
     {
-        var result = database.GetOrder(orderId);
+        var order = database.GetOrder(orderId);
+        if (order is null)
+            return NotFound();
+        var orderItems = database.GetOrderItems(orderId).ToList();
+        var result = new OrderReportFull
+        {
+            Id = order.Id,
+            UserId = order.UserId,
+            Status = order.Status,
+            ShippingAddressId = order.ShippingAddressId,
+            Items = orderItems
+        };
 
-        if (result is not null)
-            return Ok(result);
-        return NotFound();
+        return Ok(result);
     }
 
 
@@ -32,15 +40,16 @@ public class OrderReportController(Database database) : ControllerBase
         if (userId is null)
             return BadRequest();
         var id = Guid.Parse(userId);
-        var result = database.GetUserOrders(id);
-        if (result.Any())
+        var result = database.GetUserOrders(id).ToList();
+
+        if (result.Count != 0)
             return Ok(result);
 
         return NotFound();
     }
 
-    [HttpGet("/orders/all/info/items")]
-    public IActionResult GetOrderItems([FromBody] Guid orderId)
+    [HttpGet("/orders/all/{orderId:guid}/info/items")]
+    public IActionResult GetOrderItems(Guid orderId)
     {
         var result = database.GetOrderItems(orderId);
         if (result.Any())
@@ -49,13 +58,13 @@ public class OrderReportController(Database database) : ControllerBase
     }
 
     [HttpPost("/orders/create")]
-    public IActionResult CreateOrder(OrderCreateRequest orderCreateRequest)
+    public IActionResult CreateOrder([FromBody]int shippingAddressId)
     {
         var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (userId is null)
             return BadRequest();
         var id = Guid.Parse(userId);
-        var result = database.CreateOrder(orderCreateRequest,id);
+        var result = database.CreateOrder(shippingAddressId, id);
         if (result > 0)
             return Ok(result);
 

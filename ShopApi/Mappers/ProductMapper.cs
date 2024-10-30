@@ -13,7 +13,7 @@ public static class ProductMapper
             Name = request.Name,
             Description = request.Description,
             Price = request.Price,
-            IsAvailable = request.IsAvailable,
+            IsAvailable = true,
             CategoryId = request.CategoryId
         };
     }
