@@ -35,6 +35,10 @@ public class UserController(Database database, TokenGenerator tokenGenerator) : 
         if (userId is null)
             return BadRequest();
         var id = Guid.Parse(userId);
+        var cart = database.GetUserCart(id);
+        if (cart is null)
+            return NotFound();
+        item.CartId = cart.Id;
         var result = database.AddToCart(item);
         if (result < 1)
             return NotFound();
@@ -42,13 +46,26 @@ public class UserController(Database database, TokenGenerator tokenGenerator) : 
     }
 
     [Authorize]
-    [HttpDelete("/user/cart/item")]
-    public IActionResult RemoveFromCart([FromBody]Guid id)
+    [HttpDelete("/user/cart/item/{id}")]
+    public IActionResult RemoveFromCart(string id)
     {
         var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (userId is null)
             return BadRequest();
-        var result = database.RemoveFromCart(id);
+        var result = database.RemoveFromCart(int.Parse(id));
+        if (result < 1)
+            return NotFound();
+        return Ok();
+    }
+    
+    [Authorize]
+    [HttpPost("/user/cart/update")]
+    public IActionResult UpdateCart([FromBody]CartItemDto item)
+    {
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userId is null)
+            return BadRequest();
+        var result = database.UpdateQuantity(item);
         if (result < 1)
             return NotFound();
         return Ok();
@@ -59,12 +76,21 @@ public class UserController(Database database, TokenGenerator tokenGenerator) : 
     {
         var result = database.Login(userLoginRequest);
         if (result is null) return NotFound();
+        var refreshToken = tokenGenerator.GenerateRefreshToken();
+        var added = database.AddRefreshToken(refreshToken,result.Id);
+        if (added == 0)
+            return BadRequest();
         
         var token = tokenGenerator.GenerateToken(result.Id,result.EmailInfo.Email,result.IsAdmin);
         Response.Cookies.Append("ultra-shop-token",token,new CookieOptions()
         {
             SameSite = SameSiteMode.Strict,
             Expires = DateTimeOffset.UtcNow.AddHours(1)
+        });
+        Response.Cookies.Append("ultra-shop-token-refresh",refreshToken.ToString(),new CookieOptions()
+        {
+            SameSite = SameSiteMode.Strict,
+            Expires = DateTimeOffset.UtcNow.AddDays(30)
         });
         return Ok(result.MapToDto());
     }
@@ -76,6 +102,10 @@ public class UserController(Database database, TokenGenerator tokenGenerator) : 
         if (registerStatus == 0) return BadRequest();
         var result = database.Login(userRegisterRequest.MapToLoginRequest());
         if (result is null) return NotFound();
+        var refreshToken = tokenGenerator.GenerateRefreshToken();
+        var added = database.AddRefreshToken(refreshToken,result.Id);
+        if (added == 0)
+            return BadRequest();
         
         var token = tokenGenerator.GenerateToken(result.Id,result.EmailInfo.Email,result.IsAdmin);
         Response.Cookies.Append("ultra-shop-token",token,new CookieOptions()
@@ -83,7 +113,36 @@ public class UserController(Database database, TokenGenerator tokenGenerator) : 
             SameSite = SameSiteMode.Strict,
             Expires = DateTimeOffset.UtcNow.AddHours(1)
         });
+        
+        Response.Cookies.Append("ultra-shop-token-refresh",refreshToken.ToString(),new CookieOptions()
+        {
+            SameSite = SameSiteMode.Strict,
+            Expires = DateTimeOffset.UtcNow.AddDays(30)
+        });
         return Ok(result.MapToDto());
+    }
+    
+    [HttpPost("/refresh")]
+    public IActionResult Refresh()
+    {
+        var token = Request.Cookies["ultra-shop-token-refresh"];
+        if (token is null) return BadRequest();
+        var userId = database.GetRefreshTokenValue(Guid.Parse(token));
+        if (userId == null)
+            return NotFound();
+
+        var user = database.GetUserById(userId);
+        if (user == null)
+            return NotFound();
+
+        var jwtToken = tokenGenerator.GenerateToken(user.Id, user.EmailInfo.Email, user.IsAdmin);
+        Response.Cookies.Append("ultra-shop-token",jwtToken,new CookieOptions()
+        {
+            SameSite = SameSiteMode.Strict,
+            Expires = DateTimeOffset.UtcNow.AddHours(1)
+        });
+        
+        return Ok();
     }
 
     [Authorize]

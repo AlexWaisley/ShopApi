@@ -3,16 +3,17 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ShopApi.Dto;
 using ShopApi.FormModels;
+using ShopApi.Identity;
 
 namespace ShopApi.Controllers;
 
-[Authorize]
 [ApiController]
 [Route("[controller]")]
 public class OrderReportController(Database database) : ControllerBase
 {
     private readonly ILogger<OrderReportController> _logger;
 
+    [Authorize]
     [HttpGet("/orders/{orderId:guid}/all/info")]
     public IActionResult GetOrder(Guid orderId)
     {
@@ -32,7 +33,7 @@ public class OrderReportController(Database database) : ControllerBase
         return Ok(result);
     }
 
-
+    [Authorize]
     [HttpGet("/orders/user")]
     public IActionResult GetUserOrders()
     {
@@ -48,6 +49,7 @@ public class OrderReportController(Database database) : ControllerBase
         return NotFound();
     }
 
+    [Authorize]
     [HttpGet("/orders/all/{orderId:guid}/info/items")]
     public IActionResult GetOrderItems(Guid orderId)
     {
@@ -56,9 +58,29 @@ public class OrderReportController(Database database) : ControllerBase
             return Ok(result);
         return NotFound();
     }
+    
+    [Authorize (Policy = IdentityData.AdminUserPolicyName)]
+    [HttpGet("/orders/all")]
+    public IActionResult GetAllOrders()
+    {
+        var result = database.GetAllOrders().ToList();
+        if (result.Count != 0)
+            return Ok(result);
+        return NotFound();
+    }
+    
+    [Authorize (Policy = IdentityData.AdminUserPolicyName)]
+    [HttpPost("/orders/update/{orderId:guid}")]
+    public IActionResult UpdateOrderStatus(Guid orderId, [FromBody] string status)
+    {
+        var result = database.UpdateOrderStatus(orderId, status);
+        if (result > 0)
+            return Ok();
+        return NotFound();
+    }
 
-    [HttpPost("/orders/create")]
-    public IActionResult CreateOrder([FromBody]int shippingAddressId)
+    [HttpPost("/orders/create/{shippingAddressId:int}")]
+    public IActionResult CreateOrder(int shippingAddressId)
     {
         var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (userId is null)

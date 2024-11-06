@@ -6,7 +6,7 @@ namespace ShopApi.Dto;
 public class CartDto
 {
     [JsonPropertyName("id")]
-    public Guid Id { get; set; }
+    public int Id { get; set; }
     [JsonPropertyName("items")]
     public List<CartItemDto> Items { get; set; }
 }

@@ -61,7 +61,55 @@ public class Database(IConfiguration configuration)
         command.Parameters.AddWithValue("@UserName", user.Name);
         command.Parameters.AddWithValue("@IsActive", user.EmailInfo.IsActive ? 1 : 0);
         command.Parameters.AddWithValue("@UserId", user.Id);
+        var result = command.ExecuteNonQuery();
+        
+        return result == 0 ? 0 : CreateCartForUser(user.Id);
+    }
+
+    private int CreateCartForUser(Guid userId)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        const string query = """
+                             Insert into Cart (UserId)
+                             values (@UserId);
+                             """;
+        connection.Open();
+        var command = connection.CreateCommand();
+        command.CommandText = query;
+        command.Parameters.AddWithValue("@UserId", userId);
         return command.ExecuteNonQuery();
+    }
+
+    public User? GetUserById(string userId)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        const string query = """
+                             SELECT User.id, User.name, User.IsAdmin, EmailInfo.email, EmailInfo.isActive
+                             FROM User
+                             JOIN EmailInfo ON User.Id = EmailInfo.UserId
+                             WHERE User.Id = @UserId
+                             """;
+        connection.Open();
+        var command = connection.CreateCommand();
+        command.CommandText = query;
+        command.Parameters.AddWithValue("@UserId", userId);
+        using var reader = command.ExecuteReader();
+        if (reader.Read())
+        {
+            return new User()
+            {
+                Id = reader.GetGuid(0),
+                Name = reader.GetString(1),
+                IsAdmin = reader.GetBoolean(2),
+                EmailInfo = new EmailInfo
+                {
+                    Email = reader.GetString(3),
+                    IsActive = reader.GetBoolean(4)
+                }
+            };
+        }
+
+        return null;
     }
 
     public int UpdatePassword(UserPasswordUpdateRequest userPasswordUpdateRequest, Guid userId)
@@ -78,6 +126,22 @@ public class Database(IConfiguration configuration)
         command.Parameters.AddWithValue("@NewPassword", userPasswordUpdateRequest.NewPassword);
         command.Parameters.AddWithValue("@CurrentPassword", userPasswordUpdateRequest.CurrentPassword);
         command.Parameters.AddWithValue("@UserId", userId);
+        return command.ExecuteNonQuery();
+    }
+    
+    public int UpdateQuantity(CartItemDto cartItemDto)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        const string query = """
+                             Update CartItem 
+                             Set Quantity = @Quantity
+                             Where Id = @Id;
+                             """;
+        connection.Open();
+        var command = connection.CreateCommand();
+        command.CommandText = query;
+        command.Parameters.AddWithValue("@Quantity", cartItemDto.Quantity);
+        command.Parameters.AddWithValue("@Id", cartItemDto.Id);
         return command.ExecuteNonQuery();
     }
 
@@ -103,36 +167,51 @@ public class Database(IConfiguration configuration)
 
     public CartDto? GetUserCart(Guid userId)
     {
+        var cartId = GetCartId(userId);
         using var connection = new SqliteConnection(_connectionString);
         const string query = """
-                             SELECT Cart.Id, CartItem.id, CartItem.CartId, CartItem.Quantity
-                             FROM CartItem
-                             JOIN Cart ON CartItem.CartId = Cart.Id
-                             WHERE Cart.UserId = @UserId;
+                             SELECT Id, ProductId, Quantity
+                             FROM CartItem where CartId = @CartId;
                              """;
         connection.Open();
         var command = connection.CreateCommand();
         command.CommandText = query;
-        command.Parameters.AddWithValue("@UserId", userId.ToString());
+        command.Parameters.AddWithValue("@CartId", cartId);
+        using var reader = command.ExecuteReader();
+        var cartItems = new List<CartItemDto>([]);
+        while (reader.Read())
+        {
+            cartItems.Add(new CartItemDto()
+            {
+                Id = reader.GetInt32(0),
+                ProductId = reader.GetGuid(1),
+                Quantity = reader.GetInt32(2),
+                CartId = cartId
+            });
+        }
+        if(cartId == -1)
+            return null;
+        return new CartDto()
+        {
+            Id = cartId,
+            Items = cartItems
+        };
+    }
+
+    private int GetCartId(Guid userId)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        const string query = "Select Id from Cart where UserId = @UserId";
+        connection.Open();
+        var command = connection.CreateCommand();
+        command.CommandText = query;
+        command.Parameters.AddWithValue("@UserId", userId);
         using var reader = command.ExecuteReader();
         if (reader.Read())
         {
-            return new CartDto()
-            {
-                Id = reader.GetGuid(0),
-                Items =
-                [
-                    new CartItemDto
-                    {
-                        Id = reader.GetGuid(1),
-                        ProductId = reader.GetGuid(2),
-                        Quantity = reader.GetInt32(3)
-                    }
-                ]
-            };
+            return reader.GetInt32(0);
         }
-
-        return null;
+        return -1;
     }
 
     public int AddToCart(CartItemDto cartItemDto)
@@ -150,16 +229,39 @@ public class Database(IConfiguration configuration)
         command.Parameters.AddWithValue("@Quantity", cartItemDto.Quantity);
         return command.ExecuteNonQuery();
     }
+    
+    public IEnumerable<ShippingAddressDto> GetAllShippingAddress()
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        const string query = """
+                             SELECT Id, City, Street, House
+                             FROM ShippingAddress;
+                             """;
+        connection.Open();
+        var command = connection.CreateCommand();
+        command.CommandText = query;
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            yield return new ShippingAddressDto()
+            {
+                Id = reader.GetInt32(0),
+                City = reader.GetString(1),
+                Street = reader.GetString(2),
+                House = reader.GetString(3)
+            };
+        }
+    }
 
 
-    public int RemoveFromCart(Guid cartItemId)
+    public int RemoveFromCart(int cartItemId)
     {
         using var connection = new SqliteConnection(_connectionString);
         const string query = "Delete From CartItem where Id = @CartItemId";
         connection.Open();
         var command = connection.CreateCommand();
         command.CommandText = query;
-        command.Parameters.AddWithValue("@CartItemId", cartItemId.ToString());
+        command.Parameters.AddWithValue("@CartItemId", cartItemId);
         return command.ExecuteNonQuery();
     }
 
@@ -182,9 +284,9 @@ public class Database(IConfiguration configuration)
             {
                 Id = reader.GetGuid(0),
                 Name = reader.GetString(1),
-                Price = reader.GetDecimal(3),
+                Price = reader.GetDecimal(2),
                 CategoryId = reader.GetInt32(4),
-                IsAvailable = reader.GetBoolean(5)
+                IsAvailable = reader.GetBoolean(3)
             };
         }
     }
@@ -235,15 +337,15 @@ public class Database(IConfiguration configuration)
         command.Parameters.AddWithValue("@CategoryId", categoryId);
         command.Parameters.AddWithValue("@Offset", offset);
         using var reader = command.ExecuteReader();
-        if (reader.Read())
+        while (reader.Read())
         {
             yield return new ProductDto()
             {
                 Id = reader.GetGuid(0),
                 Name = reader.GetString(1),
-                Price = reader.GetDecimal(3),
+                Price = reader.GetDecimal(2),
                 CategoryId = reader.GetInt32(4),
-                IsAvailable = reader.GetBoolean(5)
+                IsAvailable = reader.GetBoolean(3)
             };
         }
     }
@@ -295,7 +397,7 @@ public class Database(IConfiguration configuration)
         command.Parameters.AddWithValue("@Count", count);
         command.Parameters.AddWithValue("@Offset", offset);
         using var reader = command.ExecuteReader();
-        if (reader.Read())
+        while (reader.Read())
         {
             yield return new ProductImage()
             {
@@ -317,7 +419,7 @@ public class Database(IConfiguration configuration)
         var command = connection.CreateCommand();
         command.CommandText = query;
         using var reader = command.ExecuteReader();
-        if (reader.Read())
+        while (reader.Read())
         {
             yield return new CategoryDto()
             {
@@ -335,14 +437,14 @@ public class Database(IConfiguration configuration)
                              SELECT Category.Id, ParentCategoryId, name, Url
                                  from Image 
                                      join Category on Image.Id = Category.ImageId
-                             where ParentCategoryId=@ParentCategoryId;
+                             where Category.ParentCategoryId=@ParentCategoryId;
                              """;
         connection.Open();
         var command = connection.CreateCommand();
         command.CommandText = query;
         command.Parameters.AddWithValue("@ParentCategoryId", parentCategoryId);
         using var reader = command.ExecuteReader();
-        if (reader.Read())
+        while (reader.Read())
         {
             yield return new CategoryDto()
             {
@@ -395,7 +497,7 @@ public class Database(IConfiguration configuration)
         command.CommandText = query;
         command.Parameters.AddWithValue("@UserId", userId);
         using var reader = command.ExecuteReader();
-        if (reader.Read())
+        while (reader.Read())
         {
             yield return new OrderDto()
             {
@@ -405,6 +507,46 @@ public class Database(IConfiguration configuration)
                 ShippingAddressId = reader.GetInt32(3)
             };
         }
+    }
+    
+    
+    public IEnumerable<OrderDto> GetAllOrders()
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        const string query = """
+                             SELECT OrderRecord.Id, UserId, Status, ShippingAddressId 
+                             From OrderRecord  
+                             """;
+        connection.Open();
+        var command = connection.CreateCommand();
+        command.CommandText = query;
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            yield return new OrderDto()
+            {
+                Id = reader.GetGuid(0),
+                UserId = reader.GetGuid(1),
+                Status = reader.GetString(2),
+                ShippingAddressId = reader.GetInt32(3)
+            };
+        }
+    }
+    
+    public int UpdateOrderStatus(Guid orderId, string status)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        const string query = """
+                             Update OrderRecord 
+                             Set Status = @Status
+                             Where Id = @OrderId;
+                             """;
+        connection.Open();
+        var command = connection.CreateCommand();
+        command.CommandText = query;
+        command.Parameters.AddWithValue("@Status", status);
+        command.Parameters.AddWithValue("@OrderId", orderId);
+        return command.ExecuteNonQuery();
     }
 
 
@@ -421,7 +563,7 @@ public class Database(IConfiguration configuration)
         command.CommandText = query;
         command.Parameters.AddWithValue("@OrderId", orderId);
         using var reader = command.ExecuteReader();
-        if (reader.Read())
+        while (reader.Read())
         {
             yield return new OrderItemDto()
             {
@@ -456,42 +598,87 @@ public class Database(IConfiguration configuration)
         if (cartInfo is null)
             return 0;
         
+        var command1 = connection.CreateCommand();
         const string query1 = """
                               Insert Into OrderItem (OrderId, ProductId, Quantity) 
                               values (@OrderId,@ProductId,@Quantity);
                               """;
-        command.CommandText = query1;
-        command.Parameters.AddWithValue("@OrderId", orderDto.Id);
+        command1.CommandText = query1;
         foreach (var orderItemDto in cartInfo.Items)
         {
-            command.Parameters.AddWithValue("@ProductId", orderItemDto.ProductId);
-            command.Parameters.AddWithValue("@Quantity", orderItemDto.Quantity);
-            command.ExecuteNonQuery();
+            command1.Parameters.Clear();
+            command1.Parameters.AddWithValue("@OrderId", orderDto.Id);
+            command1.Parameters.AddWithValue("@ProductId", orderItemDto.ProductId);
+            command1.Parameters.AddWithValue("@Quantity", orderItemDto.Quantity);
+            command1.ExecuteNonQuery();
         }
         
+        var command2 = connection.CreateCommand();
         const string query2 = "Delete From CartItem where CartId = @CartId";
-        command.CommandText = query2;
-        command.Parameters.AddWithValue("@CartId", cartInfo.Id);
-        command.ExecuteNonQuery();
+        command2.CommandText = query2;
+        command2.Parameters.AddWithValue("@CartId", cartInfo.Id);
+        command2.ExecuteNonQuery();
         
         return 1;
     }
 
-    public int AddCategory(CategoryCreateRequest categoryCreateRequest)
+    private int AddImage(string url)
+    {
+        //return image id
+        var imageId = IsImageExists(url);
+        if (imageId != -1)
+            return imageId;
+        using var connection = new SqliteConnection(_connectionString);
+        const string query = "Insert INTO Image (Url) values (@ImageUrl);";
+        connection.Open();
+        var command = connection.CreateCommand();
+        command.CommandText = query;
+        command.Parameters.AddWithValue("@ImageUrl", url);
+        command.ExecuteNonQuery();
+        command.CommandText = "SELECT last_insert_rowid();";
+        using var reader = command.ExecuteReader();
+        if (reader.Read())
+        {
+            return reader.GetInt32(0);
+        }
+
+        return -1;
+    }
+
+    private int IsImageExists(string imageUrl)
     {
         using var connection = new SqliteConnection(_connectionString);
+        const string query = "Select Id from Image where Url=@ImageUrl";
+        connection.Open();
+        var command = connection.CreateCommand();
+        command.CommandText = query;
+        command.Parameters.AddWithValue("@ImageUrl", imageUrl);
+        using var reader = command.ExecuteReader();
+        if (reader.Read())
+        {
+            return reader.GetInt32(0);
+        }
+
+        return -1;
+    }
+
+    public int AddCategory(CategoryCreateRequest categoryCreateRequest)
+    {
+        var imageId = AddImage(categoryCreateRequest.ImageUrl);
+        if (imageId == -1)
+            return 0;
+        // parent category id is 0 for root categories
+        using var connection = new SqliteConnection(_connectionString);
         const string query = """
-                             Insert INTO Image (Url)
-                             values (@ImageUrl);
                              Insert Into Category (ParentCategoryId, Name, ImageId)
-                             VALUES (@ParentCategoryId,@Name,last_insert_rowid());
+                             VALUES (@ParentCategoryId,@Name,@ImageId);
                              """;
         connection.Open();
         var command = connection.CreateCommand();
         command.CommandText = query;
-        command.Parameters.AddWithValue("@ParentCategoryId", categoryCreateRequest.ParentCategory);
+        command.Parameters.AddWithValue("@ParentCategoryId", categoryCreateRequest.ParentCategoryId);
         command.Parameters.AddWithValue("@Name", categoryCreateRequest.Name);
-        command.Parameters.AddWithValue("@ImageUrl", categoryCreateRequest.ImageUrl);
+        command.Parameters.AddWithValue("@ImageId", imageId);
         return command.ExecuteNonQuery();
     }
 
@@ -536,4 +723,33 @@ public class Database(IConfiguration configuration)
 
         return 1;
     }
+
+    public int AddRefreshToken(Guid tokenId, Guid userId)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        const string query = """
+                             Insert INTO RefreshToken (Id, UserId)
+                             values (@TokenId,@UserId);
+                             """;
+        connection.Open();
+        var command = connection.CreateCommand();
+        command.CommandText = query;
+        command.Parameters.AddWithValue("@TokenId", tokenId);
+        command.Parameters.AddWithValue("@UserId", userId);
+        
+        return command.ExecuteNonQuery();
+    }
+
+    public string? GetRefreshTokenValue(Guid token)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        const string query = "Select UserId from RefreshToken where Id=@TokenId";
+        connection.Open();
+        var command = connection.CreateCommand();
+        command.CommandText = query;
+        command.Parameters.AddWithValue("@TokenId", token);
+        using var reader = command.ExecuteReader();
+        return reader.Read() ? reader.GetString(0) : null;
+    }
+
 }

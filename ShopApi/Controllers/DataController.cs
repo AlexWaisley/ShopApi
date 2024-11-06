@@ -41,4 +41,13 @@ public class DataController(Database database) : ControllerBase
             return Ok();
         return BadRequest();
     }
+    
+    [HttpGet("/addresses")]
+    public IActionResult GetAddresses()
+    {
+        var result = database.GetAllShippingAddress();
+        if (result.Any())
+            return Ok(result);
+        return NotFound();
+    }
 }

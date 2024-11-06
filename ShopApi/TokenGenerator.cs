@@ -34,4 +34,10 @@ public class TokenGenerator(ConfigurationManager configurationManager)
         var token = tokenHandler.CreateToken(tokenDescriptor);
         return tokenHandler.WriteToken(token);
     }
+
+    public Guid GenerateRefreshToken()
+    {
+        return Guid.NewGuid();
+    }
+
 }

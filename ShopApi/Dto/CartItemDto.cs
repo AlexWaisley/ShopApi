@@ -6,11 +6,11 @@ namespace ShopApi.Dto;
 public class CartItemDto
 {
     [JsonPropertyName("id")]
-    public Guid Id { get; set; }
+    public int Id { get; set; }
     [JsonPropertyName("productId")]
     public Guid ProductId { get; set; }
     [JsonPropertyName("quantity")]
     public int Quantity { get; set; }
     [JsonPropertyName("cartId")]
-    public Guid CartId { get; set; }
+    public int CartId { get; set; }
 }

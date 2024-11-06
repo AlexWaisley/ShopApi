@@ -14,10 +14,7 @@ public class ProductController(Database database) : ControllerBase
     public IActionResult GetProducts(int count, int offset)
     {
         var result = database.GetProducts(count, offset);
-
-        if (result.Any())
-            return Ok(result);
-        return NotFound();
+        return Ok(result);
     }
 
     [HttpGet("/products/id={id:guid}/full")]
@@ -32,11 +29,8 @@ public class ProductController(Database database) : ControllerBase
     [HttpGet("/products/category/id={categoryId:int}/count={count:int}&offset={offset:int}")]
     public IActionResult GetProductsByCategory(int categoryId, int count, int offset)
     {
-        var result = database.GetProductsByCategory(categoryId, count, offset);
-
-        if (result.Any())
-            return Ok(result);
-        return NotFound();
+        var result = database.GetProductsByCategory(categoryId, count, offset).ToList();
+        return Ok(result);
     }
 
     [HttpGet("/products/id={id:guid}/previews/count={count:int}&offset={offset:int}")]
