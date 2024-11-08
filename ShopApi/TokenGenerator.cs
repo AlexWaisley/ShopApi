@@ -5,14 +5,13 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace ShopApi;
 
-public class TokenGenerator(ConfigurationManager configurationManager)
+public class TokenGenerator(IConfiguration configuration)
 {
-    private ConfigurationManager Config { get; } = configurationManager;
 
     public string GenerateToken(Guid userId, string email, bool isAdmin)
     {
         var tokenHandler = new JwtSecurityTokenHandler();
-        var key = Encoding.UTF8.GetBytes(Config["JwtSettings:Key"]!);
+        var key = Encoding.UTF8.GetBytes(configuration["JwtSettings:Key"]!);
 
         var claims = new List<Claim>()
         {
@@ -26,8 +25,8 @@ public class TokenGenerator(ConfigurationManager configurationManager)
         {
             Subject = new ClaimsIdentity(claims),
             Expires = DateTime.UtcNow.AddMinutes(60),
-            Issuer = Config["JwtSettings:Issuer"],
-            Audience = Config["JwtSettings:Audience"],
+            Issuer = configuration["JwtSettings:Issuer"],
+            Audience = configuration["JwtSettings:Audience"],
             SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key),SecurityAlgorithms.HmacSha256Signature)
         };
 

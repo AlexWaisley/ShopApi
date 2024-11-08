@@ -11,8 +11,6 @@ namespace ShopApi.Controllers;
 [Route("[controller]")]
 public class OrderReportController(Database database) : ControllerBase
 {
-    private readonly ILogger<OrderReportController> _logger;
-
     [Authorize]
     [HttpGet("/orders/{orderId:guid}/all/info")]
     public IActionResult GetOrder(Guid orderId)
@@ -70,10 +68,20 @@ public class OrderReportController(Database database) : ControllerBase
     }
     
     [Authorize (Policy = IdentityData.AdminUserPolicyName)]
-    [HttpPost("/orders/update/{orderId:guid}")]
-    public IActionResult UpdateOrderStatus(Guid orderId, [FromBody] string status)
+    [HttpGet("/orders/all/offset={offset:int}&limit={limit:int}")]
+    public IActionResult GetOrdersPart(int offset, int limit)
     {
-        var result = database.UpdateOrderStatus(orderId, status);
+        var result = database.GetOrdersPart(offset, limit).ToList();
+        if (result.Count != 0)
+            return Ok(result);
+        return NotFound();
+    }
+    
+    [Authorize (Policy = IdentityData.AdminUserPolicyName)]
+    [HttpPost("/orders/update")]
+    public IActionResult UpdateOrderStatus([FromBody] OrderStatusUpdateRequest request)
+    {
+        var result = database.UpdateOrderStatus(request.OrderId, request.Status);
         if (result > 0)
             return Ok();
         return NotFound();

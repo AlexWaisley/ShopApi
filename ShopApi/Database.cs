@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.Data.Sqlite;
 using ShopApi.Dto;
 using ShopApi.Entity;
@@ -384,10 +385,9 @@ public class Database(IConfiguration configuration)
     {
         using var connection = new SqliteConnection(_connectionString);
         const string query = """
-                             SELECT Url 
-                             From Image 
-                                 JOIN ProductImage On Image.Id = ProductImage.ImageId 
-                             where ProductImage.ProductId=@ProductId
+                             SELECT ImageId 
+                             From ProductImage
+                             where ProductId=@ProductId
                              limit @Count offset @Offset;
                              """;
         connection.Open();
@@ -401,7 +401,7 @@ public class Database(IConfiguration configuration)
         {
             yield return new ProductImage()
             {
-                Url = reader.GetString(0),
+                ImageId = reader.GetInt32(0),
                 ProductId = productId
             };
         }
@@ -752,4 +752,162 @@ public class Database(IConfiguration configuration)
         return reader.Read() ? reader.GetString(0) : null;
     }
 
+    public IEnumerable<DbFile> GetFiles()
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        const string query = "Select Id, Size, Sha256, Name, CreatedAt, ContentType from Files";
+        connection.Open();
+        var command = connection.CreateCommand();
+        command.CommandText = query;
+        using var reader = command.ExecuteReader();
+
+        while (reader.Read())
+        {
+            yield return new DbFile()
+            {
+                Id = reader.GetInt32(0),
+                Size = reader.GetInt32(1),
+                Sha256 = reader.GetString(2),
+                Name = reader.GetString(3),
+                CreatedAt = reader.GetDateTime(4),
+                ContentType = reader.GetString(5)
+            };
+        }
+    }
+    
+    
+    public DbFile? GetFileById(int id)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        const string query = "Select Id, Size, Sha256, Name, CreatedAt, ContentType from Files where Id = @Id";
+        connection.Open();
+        var command = connection.CreateCommand();
+        command.CommandText = query;
+        command.Parameters.AddWithValue("@Id", id);
+
+        using var reader = command.ExecuteReader();
+        if(reader.Read())
+        {
+            return new DbFile()
+            {
+                Id = reader.GetInt32(0),
+                Size = reader.GetInt32(1),
+                Sha256 = reader.GetString(2),
+                Name = reader.GetString(3),
+                CreatedAt = reader.GetDateTime(4),
+                ContentType = reader.GetString(5)
+            };
+        }
+
+        return null;
+    }
+
+    public int AddFile(long size, string name, string sha256, string contentType)
+    {
+        var time = DateTime.UtcNow;
+        using var connection = new SqliteConnection(_connectionString);
+        const string query = """
+                             INSERT INTO Files (Size, Sha256, Name, CreatedAt, ContentType)
+                             values (@Size,@Sha256,@Name,@CreatedAt, @ContentType) RETURNING Id;
+                             """;
+        connection.Open();
+        var command = connection.CreateCommand();
+        command.CommandText = query;
+        command.Parameters.AddWithValue("@Size", size);
+        command.Parameters.AddWithValue("@Name", name);
+        command.Parameters.AddWithValue("@Sha256", sha256);
+        command.Parameters.AddWithValue("@ContentType", contentType);
+        command.Parameters.AddWithValue("@CreatedAt", time.ToString(CultureInfo.InvariantCulture));
+
+        var reader = command.ExecuteReader(); 
+        
+        if (reader.Read())
+        {
+            return reader.GetInt32(0);
+        }
+
+        throw new NullReferenceException("Id is null");
+    }
+
+    public int? GetFileByHash(string hash)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        const string query = """
+                                Select Id from Files where Sha256 = @Hash;
+                             """;
+        connection.Open();
+        var command = connection.CreateCommand();
+        command.CommandText = query;
+        command.Parameters.AddWithValue("@Hash", hash);
+
+        var reader = command.ExecuteReader(); 
+        
+        if (reader.Read())
+        {
+            return reader.GetInt32(0);
+        }
+
+        return null;
+    }
+    
+    public IEnumerable<OrderDto> GetOrdersPart(int offset, int limit)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        const string query = """
+                             SELECT OrderRecord.Id, UserId, Status, ShippingAddressId 
+                             From OrderRecord  
+                             limit @Limit offset @Offset
+                             """;
+        connection.Open();
+        var command = connection.CreateCommand();
+        command.CommandText = query;
+        command.Parameters.AddWithValue("@Limit", limit);
+        command.Parameters.AddWithValue("@Offset", offset);
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            yield return new OrderDto()
+            {
+                Id = reader.GetGuid(0),
+                UserId = reader.GetGuid(1),
+                Status = reader.GetString(2),
+                ShippingAddressId = reader.GetInt32(3)
+            };
+        }
+    }
+
+
+    public int AddPreview(PreviewCreateRequest previewCreateRequest)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        const string query = """
+                             Insert INTO ProductImage (ProductId, ImageId)
+                             values (@ProductId, @ImageId);
+                             """;
+        connection.Open();
+        var command = connection.CreateCommand();
+        command.CommandText = query;
+        command.Parameters.AddWithValue("@ProductId", previewCreateRequest.ProductId);
+        command.Parameters.AddWithValue("@ImageId", previewCreateRequest.FileId);
+        return command.ExecuteNonQuery();
+    }
+
+    public int UpdateProduct(ProductUpdateRequest productUpdateRequest)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        const string query = """
+                             Update Product 
+                             Set Name = @Name, Description = @Description, Price = @Price, IsAvailable = @IsAvailable
+                             Where Id = @ProductId;
+                             """;
+        connection.Open();
+        var command = connection.CreateCommand();
+        command.CommandText = query;
+        command.Parameters.AddWithValue("@ProductId", productUpdateRequest.Id);
+        command.Parameters.AddWithValue("@Name", productUpdateRequest.Name);
+        command.Parameters.AddWithValue("@Description", productUpdateRequest.Description);
+        command.Parameters.AddWithValue("@Price", productUpdateRequest.Price);
+        command.Parameters.AddWithValue("@IsAvailable", productUpdateRequest.IsAvailable);
+        return command.ExecuteNonQuery();
+    }
 }

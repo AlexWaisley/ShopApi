@@ -49,7 +49,8 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddSingleton<Database>();
-builder.Services.AddSingleton<TokenGenerator>(_ => new TokenGenerator(config));
+builder.Services.AddSingleton<FileService>();
+builder.Services.AddSingleton<TokenGenerator>();
 
 
 var app = builder.Build();

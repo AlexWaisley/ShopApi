@@ -43,6 +43,15 @@ public class ProductController(Database database) : ControllerBase
         return NotFound();
     }
     
+    [HttpPost("/products/add/preview")]
+    public IActionResult AddPreview([FromBody] PreviewCreateRequest previewCreateRequest)
+    {
+        var result = database.AddPreview(previewCreateRequest);
+        if (result > 0)
+            return Ok();
+        return BadRequest();
+    }
+    
     [Authorize(Policy = IdentityData.AdminUserPolicyName)]
     [HttpPost("/products/add")]
     public IActionResult AddProduct([FromBody] ProductCreateRequest productCreateRequest)
@@ -50,6 +59,16 @@ public class ProductController(Database database) : ControllerBase
         var product = productCreateRequest.MapToEntity();
         var result = database.AddProduct(product);
         var result1 = database.AddPreviews(product.Id, productCreateRequest.Previews);
+        if (result > 0)
+            return Ok();
+        return BadRequest();
+    }
+    
+    [Authorize(Policy = IdentityData.AdminUserPolicyName)]
+    [HttpPost("/products/update")]
+    public IActionResult UpdateProduct([FromBody] ProductUpdateRequest productUpdateRequest)
+    {
+        var result = database.UpdateProduct(productUpdateRequest);
         if (result > 0)
             return Ok();
         return BadRequest();
