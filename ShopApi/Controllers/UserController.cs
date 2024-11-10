@@ -21,7 +21,7 @@ public class UserController(Database database, TokenGenerator tokenGenerator) : 
         if (userId is null)
             return BadRequest();
         var id = Guid.Parse(userId);
-        var result = database.GetUserCart(id);
+        var result = database.CartRepository.GetUserCart(id);
         if (result is null)
             return NotFound();
         return Ok(result);
@@ -35,11 +35,11 @@ public class UserController(Database database, TokenGenerator tokenGenerator) : 
         if (userId is null)
             return BadRequest();
         var id = Guid.Parse(userId);
-        var cart = database.GetUserCart(id);
+        var cart = database.CartRepository.GetUserCart(id);
         if (cart is null)
             return NotFound();
         item.CartId = cart.Id;
-        var result = database.AddToCart(item);
+        var result = database.CartRepository.AddToCart(item);
         if (result < 1)
             return NotFound();
         return Ok();
@@ -52,7 +52,7 @@ public class UserController(Database database, TokenGenerator tokenGenerator) : 
         var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (userId is null)
             return BadRequest();
-        var result = database.RemoveFromCart(int.Parse(id));
+        var result = database.CartRepository.RemoveFromCart(int.Parse(id));
         if (result < 1)
             return NotFound();
         return Ok();
@@ -65,7 +65,7 @@ public class UserController(Database database, TokenGenerator tokenGenerator) : 
         var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (userId is null)
             return BadRequest();
-        var result = database.UpdateQuantity(item);
+        var result = database.CartRepository.UpdateQuantity(item);
         if (result < 1)
             return NotFound();
         return Ok();
@@ -74,7 +74,7 @@ public class UserController(Database database, TokenGenerator tokenGenerator) : 
     [HttpPost("/login")]
     public IActionResult Login([FromBody] UserLoginRequest userLoginRequest)
     {
-        var result = database.Login(userLoginRequest);
+        var result = database.UserRepository.Login(userLoginRequest);
         if (result is null) return NotFound();
         var refreshToken = tokenGenerator.GenerateRefreshToken();
         var added = database.AddRefreshToken(refreshToken,result.Id);
@@ -98,9 +98,9 @@ public class UserController(Database database, TokenGenerator tokenGenerator) : 
     [HttpPost("/register")]
     public IActionResult Register([FromBody] UserRegisterRequest userRegisterRequest)
     {
-        var registerStatus = database.Register(userRegisterRequest);
+        var registerStatus = database.UserRepository.Register(userRegisterRequest);
         if (registerStatus == 0) return BadRequest();
-        var result = database.Login(userRegisterRequest.MapToLoginRequest());
+        var result = database.UserRepository.Login(userRegisterRequest.MapToLoginRequest());
         if (result is null) return NotFound();
         var refreshToken = tokenGenerator.GenerateRefreshToken();
         var added = database.AddRefreshToken(refreshToken,result.Id);
@@ -131,7 +131,7 @@ public class UserController(Database database, TokenGenerator tokenGenerator) : 
         if (userId == null)
             return NotFound();
 
-        var user = database.GetUserById(userId);
+        var user = database.UserRepository.GetUserById(userId);
         if (user == null)
             return NotFound();
 
@@ -160,7 +160,7 @@ public class UserController(Database database, TokenGenerator tokenGenerator) : 
         if (userId is null)
             return BadRequest();
         var id = Guid.Parse(userId);
-        var result = database.UpdatePassword(userPasswordUpdateRequest,id);
+        var result = database.UserRepository.UpdatePassword(userPasswordUpdateRequest,id);
         if (result < 1)
             return NotFound();
         return Ok();
@@ -174,7 +174,7 @@ public class UserController(Database database, TokenGenerator tokenGenerator) : 
         if (userId is null)
             return BadRequest();
         var id = Guid.Parse(userId);
-        var result = database.UpdateInfo(userUpdateInfoRequest,id);
+        var result = database.UserRepository.UpdateInfo(userUpdateInfoRequest,id);
         if (result < 1)
             return NotFound();
         return Ok();

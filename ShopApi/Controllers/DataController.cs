@@ -12,34 +12,6 @@ namespace ShopApi.Controllers;
 [Route("[controller]")]
 public class DataController(Database database, FileService fileService) : ControllerBase
 {
-    [HttpGet("/categories")]
-    public IActionResult GetCategories()
-    {
-        var result = database.GetAllCategories();
-        if (result.Any())
-            return Ok(result);
-        return NotFound();
-    }
-
-    [HttpGet("/categories/id={id:int}")]
-    public IActionResult GetCategoriesByParentId(int id)
-    {
-        var result = database.GetCategoriesByParentCategoryId(id);
-        if (result.Any())
-            return Ok(result);
-        return NotFound();
-    }
-
-    [Authorize(Policy = IdentityData.AdminUserPolicyName)]
-    [HttpPost("/categories")]
-    public IActionResult CreateCategory([FromBody] CategoryCreateRequest category)
-    {
-        var result = database.AddCategory(category);
-        if (result > 0)
-            return Ok();
-        return BadRequest();
-    }
-
     [HttpGet("/addresses")]
     public IActionResult GetAddresses()
     {
@@ -49,11 +21,10 @@ public class DataController(Database database, FileService fileService) : Contro
         return NotFound();
     }
 
-
     [HttpGet("/files")]
     public IActionResult GetFiles()
     {
-        var result = database.GetFiles();
+        var result = database.FileRepository.GetFiles();
         return Ok(result);
     }
 
@@ -66,6 +37,7 @@ public class DataController(Database database, FileService fileService) : Contro
         return PhysicalFile(result.Value.Item1, result.Value.Item2);
     }
 
+    [Authorize(Policy = IdentityData.AdminUserPolicyName)]
     [HttpPost("/files")]
     public async Task<IActionResult> AddFile(IFormFile formFile)
     {

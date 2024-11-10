@@ -10,5 +10,4 @@ public class ProductCreateRequest
     [JsonPropertyName("categoryId")] public required int CategoryId { get; set; }
     [JsonPropertyName("price")] public required decimal Price { get; set; }
     [JsonPropertyName("description")] public required string Description { get; set; }
-    [JsonPropertyName("previews")] public required List<string> Previews { get; set; }
 }

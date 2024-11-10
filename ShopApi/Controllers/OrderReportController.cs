@@ -15,10 +15,10 @@ public class OrderReportController(Database database) : ControllerBase
     [HttpGet("/orders/{orderId:guid}/all/info")]
     public IActionResult GetOrder(Guid orderId)
     {
-        var order = database.GetOrder(orderId);
+        var order = database.OrderRepository.GetOrder(orderId);
         if (order is null)
             return NotFound();
-        var orderItems = database.GetOrderItems(orderId).ToList();
+        var orderItems = database.OrderRepository.GetOrderItems(orderId).ToList();
         var result = new OrderReportFull
         {
             Id = order.Id,
@@ -39,7 +39,7 @@ public class OrderReportController(Database database) : ControllerBase
         if (userId is null)
             return BadRequest();
         var id = Guid.Parse(userId);
-        var result = database.GetUserOrders(id).ToList();
+        var result = database.OrderRepository.GetUserOrders(id).ToList();
 
         if (result.Count != 0)
             return Ok(result);
@@ -51,7 +51,7 @@ public class OrderReportController(Database database) : ControllerBase
     [HttpGet("/orders/all/{orderId:guid}/info/items")]
     public IActionResult GetOrderItems(Guid orderId)
     {
-        var result = database.GetOrderItems(orderId);
+        var result = database.OrderRepository.GetOrderItems(orderId);
         if (result.Any())
             return Ok(result);
         return NotFound();
@@ -61,7 +61,7 @@ public class OrderReportController(Database database) : ControllerBase
     [HttpGet("/orders/all")]
     public IActionResult GetAllOrders()
     {
-        var result = database.GetAllOrders().ToList();
+        var result = database.OrderRepository.GetAllOrders().ToList();
         if (result.Count != 0)
             return Ok(result);
         return NotFound();
@@ -71,7 +71,7 @@ public class OrderReportController(Database database) : ControllerBase
     [HttpGet("/orders/all/offset={offset:int}&limit={limit:int}")]
     public IActionResult GetOrdersPart(int offset, int limit)
     {
-        var result = database.GetOrdersPart(offset, limit).ToList();
+        var result = database.OrderRepository.GetOrdersPart(offset, limit).ToList();
         if (result.Count != 0)
             return Ok(result);
         return NotFound();
@@ -81,12 +81,13 @@ public class OrderReportController(Database database) : ControllerBase
     [HttpPost("/orders/update")]
     public IActionResult UpdateOrderStatus([FromBody] OrderStatusUpdateRequest request)
     {
-        var result = database.UpdateOrderStatus(request.OrderId, request.Status);
+        var result = database.OrderRepository.UpdateOrderStatus(request.OrderId, request.Status);
         if (result > 0)
             return Ok();
         return NotFound();
     }
 
+    [Authorize]
     [HttpPost("/orders/create/{shippingAddressId:int}")]
     public IActionResult CreateOrder(int shippingAddressId)
     {
@@ -94,7 +95,9 @@ public class OrderReportController(Database database) : ControllerBase
         if (userId is null)
             return BadRequest();
         var id = Guid.Parse(userId);
-        var result = database.CreateOrder(shippingAddressId, id);
+        var cartInfo = database.CartRepository.GetUserCart(id);
+        if (cartInfo == null) return NotFound();
+        var result = database.OrderRepository.CreateOrder(shippingAddressId, id, cartInfo);
         if (result > 0)
             return Ok(result);
 
