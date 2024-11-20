@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Microsoft.Data.Sqlite;
 using ShopApi.Data.Cart;
 using ShopApi.Data.Categories;
@@ -11,7 +12,9 @@ namespace ShopApi;
 
 public class Database(IConfiguration configuration)
 {
-    private readonly string _connectionString = configuration.GetConnectionString("DefaultConnection")!;
+    private static readonly bool IsLinux = RuntimeInformation.IsOSPlatform(OSPlatform.Linux);
+    private readonly string _connectionString = (IsLinux ? configuration.GetConnectionString("DefaultConnectionLinux") 
+        : configuration.GetConnectionString("DefaultConnection"))!;
 
     public IUserRepository UserRepository => new UserRepository(_connectionString);
     public IProductRepository ProductRepository => new ProductRepository(_connectionString);

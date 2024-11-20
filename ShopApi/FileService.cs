@@ -1,16 +1,15 @@
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 
 namespace ShopApi;
 
 public class FileService(IConfiguration configuration, Database database)
 {
-    public async Task<int> CreateNewFile(string tempFilePath,string fileName, string contentType)
+    private static readonly bool IsLinux = RuntimeInformation.IsOSPlatform(OSPlatform.Linux);
+    private readonly string _filesPath = (IsLinux ? configuration["FilesPathLinux"] : configuration["FilesPath"])!;
+
+    public async Task<int> CreateNewFile(string tempFilePath, string fileName, string contentType)
     {
-        var filesPath = configuration["FilesPath"];
-
-        if (filesPath is null)
-            throw new NullReferenceException("FilesPath is null");
-
         var fileInfo = new FileInfo(tempFilePath);
         var size = fileInfo.Length;
         await using var stream = fileInfo.OpenRead();
@@ -19,19 +18,19 @@ public class FileService(IConfiguration configuration, Database database)
         var hashResult = database.FileRepository.GetFileByHash(hash);
         if (hashResult != null)
             return (int)hashResult;
-        
+
         var result = database.FileRepository.AddFile(size, fileName, hash, contentType);
 
-        var fileDir = Path.Combine(filesPath, result.ToString());
+        var fileDir = Path.Combine(_filesPath, result.ToString());
 
         Directory.CreateDirectory(fileDir);
-        
-        var filePath = Path.Combine(fileDir,fileName);
+
+        var filePath = Path.Combine(fileDir, fileName);
 
         await using var fileStream = File.OpenWrite(filePath);
 
         await stream.CopyToAsync(fileStream);
-        
+
         return result;
     }
 
@@ -44,20 +43,16 @@ public class FileService(IConfiguration configuration, Database database)
         return Convert.ToHexString(hash).ToLowerInvariant();
     }
 
-    public (string,string)? ResolveFileName(int id)
+    public (string, string)? ResolveFileName(int id)
     {
         var dbFile = database.FileRepository.GetFileById(id);
         if (dbFile is null)
             return null;
-        
-        var filesPath = configuration["FilesPath"];
 
-        if (filesPath is null)
-            throw new NullReferenceException("FilesPath is null");
 
-        var fileDir = Path.Combine(filesPath, dbFile.Id.ToString());
-        var filePath = Path.Combine(fileDir,dbFile.Name);
+        var fileDir = Path.Combine(_filesPath, dbFile.Id.ToString());
+        var filePath = Path.Combine(fileDir, dbFile.Name);
 
-        return (filePath,dbFile.ContentType);
+        return (filePath, dbFile.ContentType);
     }
 }
