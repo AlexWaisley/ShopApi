@@ -17,6 +17,15 @@ public class ProductController(Database database) : ControllerBase
         return Ok(result);
     }
 
+    [HttpGet("/products/general/id={id:guid}")]
+    public IActionResult GetProductById(Guid id)
+    {
+        var result = database.ProductRepository.GetProductById(id);
+        if (result is not null)
+            return Ok(result);
+        return NotFound();
+    }
+
     [HttpGet("/products/id={id:guid}/full")]
     public IActionResult GetFullProduct(Guid id)
     {

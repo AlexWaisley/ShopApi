@@ -54,9 +54,9 @@ public class ProductRepository(string connectionString) : IProductRepository
             {
                 Id = reader.GetGuid(0),
                 Name = reader.GetString(1),
-                Price = reader.GetDecimal(3),
+                Price = reader.GetDecimal(2),
                 CategoryId = reader.GetInt32(4),
-                IsAvailable = reader.GetBoolean(5)
+                IsAvailable = reader.GetBoolean(3)
             };
         }
 
